@@ -12,73 +12,33 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.x'
-
-      - name: Install Official Google Drive Client
+      - name: Install Cloud Sync Tool
         run: |
-          pip install google-api-python-client google-auth
-
-      - name: Authenticate to Google Cloud Natively
-        id: auth
-        uses: google-github-actions/auth@v2
-        with:
-          credentials_json: ${{ secrets.GOOGLE_CREDENTIALS }}
-          token_format: 'access_token'
-
-      - name: Download Whole Folder from Google Drive API
-        run: |
-          cat << 'EOF' > download_folder.py
-          import os
-          from google.oauth2.credentials import Credentials
-          from googleapiclient.discovery import build
-          from googleapiclient.errors import HttpError
-
-          # Uses the freshly validated token directly from the official auth step
-          access_token = os.environ['GOOGLE_ACCESS_TOKEN']
+          sudo rclone self-update || true
           
-          # Explicitly applies the correct readonly scopes directly to the live credentials instance
-          creds = Credentials(
-              token=access_token,
-              scopes=['https://googleapis.com']
-          )
-
-          drive_service = build('drive', 'v3', credentials=creds)
-          folder_id = os.environ['GDRIVE_FOLDER_ID']
-
-          try:
-              results = drive_service.files().list(
-                  q=f"'{folder_id}' in parents and trashed = false",
-                  fields="files(id, name, mimeType)"
-              ).execute()
-              files = results.get('files', [])
-
-              with open('./AGENTS.md', 'w', encoding='utf-8') as agents_file:
-                  for f in files:
-                      if 'document' in f['mimeType'] or 'markdown' in f['mimeType'] or 'text' in f['mimeType']:
-                          print(f"Downloading file: {f['name']}")
-                          
-                          if 'google-apps.document' in f['mimeType']:
-                              content = drive_service.files().export(
-                                  fileId=f['id'], mimeType='text/plain'
-                              ).execute()
-                          else:
-                              content = drive_service.files().get_media(fileId=f['id']).execute()
-                              
-                          agents_file.write(f"\n\n# --- File: {f['name']} ---\n")
-                          agents_file.write(content.decode('utf-8'))
-                          
-          except HttpError as error:
-              print(f"An error occurred: {error}")
-              exit(1)
+      - name: Configure and Sync Google Drive Folder
+        run: |
+          # 1. Create a secure folder configuration for rclone using your service account
+          mkdir -p ~/.config/rclone
+          echo '${{ secrets.GOOGLE_CREDENTIALS }}' > ~/.config/rclone/sa.json
+          
+          cat <<EOF > ~/.config/rclone/rclone.conf
+          [gdrive]
+          type = drive
+          scope = drive.readonly
+          service_account_file = ~/.config/rclone/sa.json
+          root_folder_id = ${{ secrets.GDRIVE_FOLDER_ID }}
           EOF
 
-          python download_folder.py
-        env:
-          GOOGLE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
-          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
+          # 2. Download all text/markdown files inside your folder path
+          mkdir -p ./gdrive_files
+          rclone copy gdrive: ./gdrive_files --include "*.txt" --include "*.md" --include "*.gdoc" || true
+
+          # 3. Safely compile them directly into your primary AGENTS.md instruction file
+          cat ./gdrive_files/* 2>/dev/null | grep -v '^$' > ./AGENTS.md || echo "# Project Rules" > ./AGENTS.md
+          
+          # Clean up temporary folder
+          rm -rf ./gdrive_files ~/.config/rclone/sa.json
 
       - name: Commit and Push Changes to GitHub
         run: |
