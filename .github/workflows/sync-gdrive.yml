@@ -2,8 +2,8 @@ name: Sync Google Drive
 
 on:
   schedule:
-    - cron: '0 * * * *' # Automatically runs every hour
-  workflow_dispatch: # Enables your manual trigger button
+    - cron: '0 * * * *' # Automatically runs every single hour
+  workflow_dispatch: # Enables your manual "Run workflow" button
 
 jobs:
   sync:
@@ -19,41 +19,42 @@ jobs:
 
       - name: Install Official Google Drive Client
         run: |
-          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
+          pip install google-api-python-client google-auth
+
+      - name: Authenticate to Google Cloud Natively
+        id: auth
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GOOGLE_CREDENTIALS }}
+          token_format: 'access_token'
 
       - name: Download Whole Folder from Google Drive API
         run: |
           cat << 'EOF' > download_folder.py
           import os
-          import json
-          from google.oauth2 import service_account
+          from google.oauth2.credentials import Credentials
           from googleapiclient.discovery import build
           from googleapiclient.errors import HttpError
 
-          # Load private credentials from secret locker
-          creds_json = json.loads(os.environ['GOOGLE_CREDENTIALS'])
-          creds = service_account.Credentials.from_service_account_info(
-              creds_json, scopes=['https://googleapis.com']
-          )
+          # Uses the freshly validated token directly from the official auth step
+          access_token = os.environ['GOOGLE_ACCESS_TOKEN']
+          creds = Credentials(token=access_token)
 
           drive_service = build('drive', 'v3', credentials=creds)
           folder_id = os.environ['GDRIVE_FOLDER_ID']
 
           try:
-              # Query all files located inside your specified folder path
               results = drive_service.files().list(
                   q=f"'{folder_id}' in parents and trashed = false",
                   fields="files(id, name, mimeType)"
               ).execute()
               files = results.get('files', [])
 
-              # Open up your primary Codex instructions file
               with open('./AGENTS.md', 'w', encoding='utf-8') as agents_file:
                   for f in files:
                       if 'document' in f['mimeType'] or 'markdown' in f['mimeType'] or 'text' in f['mimeType']:
                           print(f"Downloading file: {f['name']}")
                           
-                          # Export standard Google Docs as plain text to preserve text data structures
                           if 'google-apps.document' in f['mimeType']:
                               content = drive_service.files().export(
                                   fileId=f['id'], mimeType='text/plain'
@@ -71,13 +72,13 @@ jobs:
 
           python download_folder.py
         env:
-          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GOOGLE_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
           GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
 
       - name: Commit and Push Changes to GitHub
         run: |
           git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.email "github-actions[bot]@://github.com"
           git add AGENTS.md
-          git commit -m "Cloud Sync: Synced folder data safely to AGENTS.md" || exit 0
+          git commit -m "Cloud Sync: Safely compiled rules from Google Drive" || exit 0
           git push
