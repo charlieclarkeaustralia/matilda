@@ -2,7 +2,7 @@ name: Sync Google Drive
 
 on:
   schedule:
-    - cron: '0 * * * *' # Automatically runs every single hour
+    - cron: '0 * * * *' # Automatically runs every hour
   workflow_dispatch: # Enables your manual "Run workflow" button
 
 jobs:
@@ -27,7 +27,6 @@ jobs:
         with:
           credentials_json: ${{ secrets.GOOGLE_CREDENTIALS }}
           token_format: 'access_token'
-          access_token_scopes: 'https://googleapis.com'
 
       - name: Download Whole Folder from Google Drive API
         run: |
@@ -79,7 +78,7 @@ jobs:
       - name: Commit and Push Changes to GitHub
         run: |
           git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.email "github-actions[bot]@://github.com"
           git add AGENTS.md
           git commit -m "Cloud Sync: Safely compiled rules from Google Drive" || exit 0
           git push
