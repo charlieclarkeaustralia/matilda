@@ -38,7 +38,12 @@ jobs:
 
           # Uses the freshly validated token directly from the official auth step
           access_token = os.environ['GOOGLE_ACCESS_TOKEN']
-          creds = Credentials(token=access_token)
+          
+          # Explicitly applies the correct readonly scopes directly to the live credentials instance
+          creds = Credentials(
+              token=access_token,
+              scopes=['https://googleapis.com']
+          )
 
           drive_service = build('drive', 'v3', credentials=creds)
           folder_id = os.environ['GDRIVE_FOLDER_ID']
