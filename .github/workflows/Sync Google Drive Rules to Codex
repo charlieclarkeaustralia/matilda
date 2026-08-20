@@ -2,8 +2,8 @@ name: Sync Google Drive Rules to Codex
 
 on:
   schedule:
-    - cron: '0 * * * *' # Automatically runs every single hour
-  workflow_dispatch: # Allows you to also trigger it manually with a single click
+    - cron: '0 * * * *' # Automatically runs every hour
+  workflow_dispatch: # Allows manual trigger
 
 jobs:
   sync:
@@ -12,21 +12,22 @@ jobs:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      - name: Download Docs from Google Drive
+      - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GOOGLE_CREDENTIALS }}
 
-      - name: Export Drive Folder as Markdown
-        uses: JuroOravec/google-docs-to-github@v1
-        with:
-          folderId: ${{ secrets.GDRIVE_FOLDER_ID }}
-          destination: './AGENTS.md' # Saves it directly into your root for Codex
+      - name: Download File from Google Drive
+        run: |
+          # Uses curl to download the file directly using your folder information securely
+          curl -H "Authorization: Bearer $(gcloud auth print-access-token)" \
+            -o ./AGENTS.md \
+            "https://googleapis.com{{ secrets.GDRIVE_FOLDER_ID }}?alt=media"
 
       - name: Commit and Push Changes to GitHub
         run: |
           git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.email "github-actions[bot]@://github.com"
           git add AGENTS.md
           git commit -m "Cloud Sync: Updated instructions from Google Drive" || exit 0
           git push
