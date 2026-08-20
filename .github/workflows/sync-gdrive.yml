@@ -2,8 +2,8 @@ name: Sync Google Drive
 
 on:
   schedule:
-    - cron: '0 * * * *' # Automatically runs every single hour
-  workflow_dispatch: # Allows manual trigger button click
+    - cron: '0 * * * *' # Automatically runs every hour
+  workflow_dispatch: # Enables your manual trigger button
 
 jobs:
   sync:
@@ -17,28 +17,67 @@ jobs:
         with:
           python-version: '3.x'
 
-      - name: Install Google Drive Downloader Tool
+      - name: Install Official Google Drive Client
         run: |
-          pip install gdown
+          pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
 
-      - name: Download Folder with Service Account Credentials
+      - name: Download Whole Folder from Google Drive API
         run: |
-          # Saves your secure JSON key temporarily onto the runner disk
-          echo '${{ secrets.GOOGLE_CREDENTIALS }}' > service_account.json
-          
-          # Downloads your folder using full service account authentication
-          gdown --folder "https://google.com{{ secrets.GDRIVE_FOLDER_ID }}" --service-account service_account.json
+          cat << 'EOF' > download_folder.py
+          import os
+          import json
+          from google.oauth2 import service_account
+          from googleapiclient.discovery import build
+          from googleapiclient.errors import HttpError
 
-          # Clean up the key file right after download for security
-          rm service_account.json
+          # Load private credentials from secret locker
+          creds_json = json.loads(os.environ['GOOGLE_CREDENTIALS'])
+          creds = service_account.Credentials.from_service_account_info(
+              creds_json, scopes=['https://googleapis.com']
+          )
 
-          # Combines all text data found in the folder wrapper into your root context file
-          cat * ./* 2>/dev/null | grep -v '^$' > ./AGENTS.md || true
+          drive_service = build('drive', 'v3', credentials=creds)
+          folder_id = os.environ['GDRIVE_FOLDER_ID']
+
+          try:
+              # Query all files located inside your specified folder path
+              results = drive_service.files().list(
+                  q=f"'{folder_id}' in parents and trashed = false",
+                  fields="files(id, name, mimeType)"
+              ).execute()
+              files = results.get('files', [])
+
+              # Open up your primary Codex instructions file
+              with open('./AGENTS.md', 'w', encoding='utf-8') as agents_file:
+                  for f in files:
+                      if 'document' in f['mimeType'] or 'markdown' in f['mimeType'] or 'text' in f['mimeType']:
+                          print(f"Downloading file: {f['name']}")
+                          
+                          # Export standard Google Docs as plain text to preserve text data structures
+                          if 'google-apps.document' in f['mimeType']:
+                              content = drive_service.files().export(
+                                  fileId=f['id'], mimeType='text/plain'
+                              ).execute()
+                          else:
+                              content = drive_service.files().get_media(fileId=f['id']).execute()
+                              
+                          agents_file.write(f"\n\n# --- File: {f['name']} ---\n")
+                          agents_file.write(content.decode('utf-8'))
+                          
+          except HttpError as error:
+              print(f"An error occurred: {error}")
+              exit(1)
+          EOF
+
+          python download_folder.py
+        env:
+          GOOGLE_CREDENTIALS: ${{ secrets.GOOGLE_CREDENTIALS }}
+          GDRIVE_FOLDER_ID: ${{ secrets.GDRIVE_FOLDER_ID }}
 
       - name: Commit and Push Changes to GitHub
         run: |
           git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@://github.com"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
           git add AGENTS.md
-          git commit -m "Cloud Sync: Safely updated all instructions from Google Drive" || exit 0
+          git commit -m "Cloud Sync: Synced folder data safely to AGENTS.md" || exit 0
           git push
