@@ -3,7 +3,7 @@ name: Sync Google Drive
 on:
   schedule:
     - cron: '0 * * * *' # Automatically runs every hour
-  workflow_dispatch: # Enables your manual trigger button
+  workflow_dispatch: # Enables your manual "Run workflow" button
 
 jobs:
   sync:
@@ -19,7 +19,7 @@ jobs:
 
       - name: Download File from Google Drive
         run: |
-          # Safely downloads your Google file directly into the AGENTS.md folder wrapper
+          # Securely fetches your Google doc file directly using your stored credentials
           curl -H "Authorization: Bearer $(gcloud auth print-access-token)" \
             -o ./AGENTS.md \
             "https://googleapis.com{{ secrets.GDRIVE_FOLDER_ID }}?alt=media"
