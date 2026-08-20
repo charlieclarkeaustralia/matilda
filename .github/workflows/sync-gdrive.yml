@@ -27,7 +27,7 @@ jobs:
         with:
           credentials_json: ${{ secrets.GOOGLE_CREDENTIALS }}
           token_format: 'access_token'
-
+ access_token_scopes: 'https://googleapis.com'
       - name: Download Whole Folder from Google Drive API
         run: |
           cat << 'EOF' > download_folder.py
