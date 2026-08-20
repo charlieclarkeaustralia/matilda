@@ -2,8 +2,8 @@ name: Sync Google Drive
 
 on:
   schedule:
-    - cron: '0 * * * *' # Automatically runs every hour
-  workflow_dispatch: # Enables your manual "Run workflow" button
+    - cron: '0 * * * *' # Automatically runs every single hour
+  workflow_dispatch: # Allows manual trigger button click
 
 jobs:
   sync:
@@ -21,18 +21,24 @@ jobs:
         run: |
           pip install gdown
 
-      - name: Download Whole Folder from Google Drive
+      - name: Download Folder with Service Account Credentials
         run: |
-          # Recursively downloads your entire folder structure into a temporary directory
-          gdown --folder "https://google.com{{ secrets.GDRIVE_FOLDER_ID }}"
+          # Saves your secure JSON key temporarily onto the runner disk
+          echo '${{ secrets.GOOGLE_CREDENTIALS }}' > service_account.json
+          
+          # Downloads your folder using full service account authentication
+          gdown --folder "https://google.com{{ secrets.GDRIVE_FOLDER_ID }}" --service-account service_account.json
 
-          # Combines all the text/markdown files inside that folder into your main AGENTS.md
+          # Clean up the key file right after download for security
+          rm service_account.json
+
+          # Combines all text data found in the folder wrapper into your root context file
           cat * ./* 2>/dev/null | grep -v '^$' > ./AGENTS.md || true
 
       - name: Commit and Push Changes to GitHub
         run: |
           git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git config --global user.email "github-actions[bot]@://github.com"
           git add AGENTS.md
-          git commit -m "Cloud Sync: Updated all instructions from Google Drive Folder" || exit 0
+          git commit -m "Cloud Sync: Safely updated all instructions from Google Drive" || exit 0
           git push
