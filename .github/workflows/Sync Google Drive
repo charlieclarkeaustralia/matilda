@@ -1,9 +1,9 @@
-name: Sync Google Drive Rules to Codex
+name: Sync Google Drive
 
 on:
   schedule:
     - cron: '0 * * * *' # Automatically runs every hour
-  workflow_dispatch: # Allows manual trigger
+  workflow_dispatch: # Enables your manual trigger button
 
 jobs:
   sync:
@@ -19,7 +19,7 @@ jobs:
 
       - name: Download File from Google Drive
         run: |
-          # Uses curl to download the file directly using your folder information securely
+          # Safely downloads your Google file directly into the AGENTS.md folder wrapper
           curl -H "Authorization: Bearer $(gcloud auth print-access-token)" \
             -o ./AGENTS.md \
             "https://googleapis.com{{ secrets.GDRIVE_FOLDER_ID }}?alt=media"
