@@ -30,9 +30,9 @@ jobs:
           root_folder_id = ${{ secrets.GDRIVE_FOLDER_ID }}
           EOF
 
-          # 2. Download all text, markdown, and Word files inside your folder path and subfolders
+          # 2. Download all files and automatically convert Google Docs to readable markdown text
           mkdir -p ./gdrive_files
-          rclone copy gdrive: ./gdrive_files --include "**/*.txt" --include "**/*.md" --include "**/*.gdoc" --include "**/*.docx" || true
+          rclone copy gdrive: ./gdrive_files --include "**/*.txt" --include "**/*.md" --include "**/*.docx" --drive-export-formats md || true
 
           # 3. Safely compile them directly into your primary AGENTS.md instruction file
           cat ./gdrive_files/* 2>/dev/null | grep -v '^$' > ./AGENTS.md || echo "# Project Rules" > ./AGENTS.md
