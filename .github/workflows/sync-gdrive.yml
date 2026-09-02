@@ -34,8 +34,8 @@ jobs:
           mkdir -p ./gdrive_files
           rclone copy gdrive: ./gdrive_files --drive-export-formats md --fast-list -vv || true
 
-          # 3. Safely compile every single downloaded file stream directly into your primary AGENTS.md file
-          cat $(find ./gdrive_files -type f) 2>/dev/null | grep -v '^$' > ./AGENTS.md || echo "# Project Rules" > ./AGENTS.md
+          # 3. Safely compile every valid text/markdown file stream directly into your primary AGENTS.md file
+          find ./gdrive_files -type f -not -name ".*" -exec cat {} + 2>/dev/null | grep -v '^$' > ./AGENTS.md || echo "# Project Rules" > ./AGENTS.md
           
           # Clean up temporary folder
           rm -rf ./gdrive_files ~/.config/rclone/sa.json
