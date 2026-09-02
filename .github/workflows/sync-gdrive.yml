@@ -32,7 +32,7 @@ jobs:
 
           # 2. Download all text/markdown files inside your folder path
           mkdir -p ./gdrive_files
-          rclone copy gdrive: ./gdrive_files --include "*.txt" --include "*.md" --include "*.gdoc" || true
+rclone copy gdrive: ./gdrive_files --include "**/*.txt" --include "**/*.md" --include "**/*.gdoc" --include "**/*.docx" || true
 
           # 3. Safely compile them directly into your primary AGENTS.md instruction file
           cat ./gdrive_files/* 2>/dev/null | grep -v '^$' > ./AGENTS.md || echo "# Project Rules" > ./AGENTS.md
